@@ -243,6 +243,59 @@ export default function App() {
     return () => window.removeEventListener('keydown', onKey)
   }, [])
 
+  const filterUserScope = activeNS === 'all' && hideSystem
+
+  const visiblePods = useMemo(
+    () => (filterUserScope ? pods.filter((p) => !SYSTEM_NAMESPACES.has(p.namespace)) : pods),
+    [pods, filterUserScope],
+  )
+  const visibleWorkloads = useMemo(
+    () => (filterUserScope ? workloads.filter((w) => !SYSTEM_NAMESPACES.has(w.namespace)) : workloads),
+    [workloads, filterUserScope],
+  )
+  const visibleServices = useMemo(
+    () => (filterUserScope ? services.filter((s) => !SYSTEM_NAMESPACES.has(s.namespace)) : services),
+    [services, filterUserScope],
+  )
+  const visibleIngresses = useMemo(
+    () => (filterUserScope ? ingresses.filter((i) => !SYSTEM_NAMESPACES.has(i.namespace)) : ingresses),
+    [ingresses, filterUserScope],
+  )
+  const visibleConfigMaps = useMemo(
+    () => (filterUserScope ? configMaps.filter((c) => !SYSTEM_NAMESPACES.has(c.namespace)) : configMaps),
+    [configMaps, filterUserScope],
+  )
+  const visibleSecrets = useMemo(
+    () => (filterUserScope ? secrets.filter((s) => !SYSTEM_NAMESPACES.has(s.namespace)) : secrets),
+    [secrets, filterUserScope],
+  )
+  const visiblePvcs = useMemo(
+    () => (filterUserScope ? pvcs.filter((p) => !SYSTEM_NAMESPACES.has(p.namespace)) : pvcs),
+    [pvcs, filterUserScope],
+  )
+  const visibleEvents = useMemo(
+    () => (filterUserScope ? events.filter((e) => !SYSTEM_NAMESPACES.has(e.namespace)) : events),
+    [events, filterUserScope],
+  )
+  const visibleTopology = useMemo(() => {
+    if (!topology || !filterUserScope) return topology
+    const nodes = topology.nodes.filter((n) => !SYSTEM_NAMESPACES.has(n.namespace))
+    const ids = new Set(nodes.map((n) => n.id))
+    return {
+      ...topology,
+      nodes,
+      edges: topology.edges.filter((e) => ids.has(e.source) && ids.has(e.target)),
+      groups: topology.groups.filter((g) => !SYSTEM_NAMESPACES.has(g.namespace)),
+    }
+  }, [topology, filterUserScope])
+
+  const defaultTargetNS = useMemo(() => {
+    if (activeNS !== 'all') return activeNS
+    if (namespaces.some((n) => n.name === 'production')) return 'production'
+    const firstUser = namespaces.find((n) => !SYSTEM_NAMESPACES.has(n.name))
+    return firstUser?.name || 'default'
+  }, [activeNS, namespaces])
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoginBusy(true)
@@ -344,59 +397,6 @@ export default function App() {
       showToast((e as Error).message)
     }
   }
-
-  const filterUserScope = activeNS === 'all' && hideSystem
-
-  const visiblePods = useMemo(
-    () => (filterUserScope ? pods.filter((p) => !SYSTEM_NAMESPACES.has(p.namespace)) : pods),
-    [pods, filterUserScope],
-  )
-  const visibleWorkloads = useMemo(
-    () => (filterUserScope ? workloads.filter((w) => !SYSTEM_NAMESPACES.has(w.namespace)) : workloads),
-    [workloads, filterUserScope],
-  )
-  const visibleServices = useMemo(
-    () => (filterUserScope ? services.filter((s) => !SYSTEM_NAMESPACES.has(s.namespace)) : services),
-    [services, filterUserScope],
-  )
-  const visibleIngresses = useMemo(
-    () => (filterUserScope ? ingresses.filter((i) => !SYSTEM_NAMESPACES.has(i.namespace)) : ingresses),
-    [ingresses, filterUserScope],
-  )
-  const visibleConfigMaps = useMemo(
-    () => (filterUserScope ? configMaps.filter((c) => !SYSTEM_NAMESPACES.has(c.namespace)) : configMaps),
-    [configMaps, filterUserScope],
-  )
-  const visibleSecrets = useMemo(
-    () => (filterUserScope ? secrets.filter((s) => !SYSTEM_NAMESPACES.has(s.namespace)) : secrets),
-    [secrets, filterUserScope],
-  )
-  const visiblePvcs = useMemo(
-    () => (filterUserScope ? pvcs.filter((p) => !SYSTEM_NAMESPACES.has(p.namespace)) : pvcs),
-    [pvcs, filterUserScope],
-  )
-  const visibleEvents = useMemo(
-    () => (filterUserScope ? events.filter((e) => !SYSTEM_NAMESPACES.has(e.namespace)) : events),
-    [events, filterUserScope],
-  )
-  const visibleTopology = useMemo(() => {
-    if (!topology || !filterUserScope) return topology
-    const nodes = topology.nodes.filter((n) => !SYSTEM_NAMESPACES.has(n.namespace))
-    const ids = new Set(nodes.map((n) => n.id))
-    return {
-      ...topology,
-      nodes,
-      edges: topology.edges.filter((e) => ids.has(e.source) && ids.has(e.target)),
-      groups: topology.groups.filter((g) => !SYSTEM_NAMESPACES.has(g.namespace)),
-    }
-  }, [topology, filterUserScope])
-
-  const defaultTargetNS = useMemo(() => {
-    if (activeNS !== 'all') return activeNS
-    if (namespaces.some((n) => n.name === 'production')) return 'production'
-    const firstUser = namespaces.find((n) => !SYSTEM_NAMESPACES.has(n.name))
-    return firstUser?.name || 'default'
-  }, [activeNS, namespaces])
 
   const handlePerspectiveChange = (next: Perspective) => {
     setPerspective(next)
