@@ -27,10 +27,20 @@ type Config struct {
 func Load() Config {
 	defaultKubeconfig := os.Getenv("KUBECONFIG")
 	if defaultKubeconfig == "" {
+		var candidates []string
 		if home, err := os.UserHomeDir(); err == nil {
-			candidate := filepath.Join(home, ".kube", "config")
-			if _, statErr := os.Stat(candidate); statErr == nil {
+			candidates = append(candidates, filepath.Join(home, ".kube", "config"))
+		}
+		candidates = append(candidates,
+			"/etc/rancher/k3s/k3s.yaml",
+			"/etc/rancher/rke2/rke2.yaml",
+			"/etc/kubernetes/admin.conf",
+		)
+		for _, candidate := range candidates {
+			if f, err := os.Open(candidate); err == nil {
+				_ = f.Close()
 				defaultKubeconfig = candidate
+				break
 			}
 		}
 	}

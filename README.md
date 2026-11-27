@@ -69,7 +69,12 @@ make build
 ```
 
 Open `http://localhost:8080`.
-If `~/.kube/config` exists, Zetnix loads your active context automatically; otherwise it starts in **Demo Sandbox Mode** (you can also force demo mode anytime with `--demo`).
+
+#### Automatic Cluster Discovery Order
+Unless `--demo` or `--kubeconfig` is specified explicitly, Zetnix automatically checks for a local cluster on startup in this order:
+1. **In-Cluster (`ServiceAccount`)** — when running inside a Kubernetes Pod.
+2. **Readable Kubeconfig** — checks `$KUBECONFIG`, `~/.kube/config`, `/etc/rancher/k3s/k3s.yaml`, `/etc/rancher/rke2/rke2.yaml`, and `/etc/kubernetes/admin.conf` in order.
+3. **Demo Sandbox Mode** — automatic fallback when no cluster config is present or readable.
 
 ### 2. Run with Docker
 
@@ -91,7 +96,23 @@ docker run --rm -p 8080:8080 \
 
 ## Deploying on a VPS / Production
 
-Running Zetnix directly on the same VPS or inside the Kubernetes cluster eliminates SSH tunnel latency and gives sub-10ms API response times.
+Running Zetnix directly on the same VPS or inside the Kubernetes cluster eliminates SSH tunnel latency and gives sub-10ms API response times. Because Zetnix automatically discovers local kubeconfigs on startup, pulling and running it on a server with an existing Kubernetes cluster (`k3s`, `k3d`, `rke2`, or `kubeadm`) works out of the box.
+
+### Pull & Build Directly on the VPS
+
+- **Without installing Go/Node.js on the host** (uses multi-stage Docker build):
+  ```bash
+  git clone https://github.com/<your-username>/zetnix.git
+  cd zetnix
+  docker build -t zetnix:1.0.0 .
+  ```
+- **Or compile natively on the VPS** (requires Node.js `20+` and Go `1.26+`):
+  ```bash
+  git pull
+  make build
+  ZETNIX_AUTH_USER=admin ZETNIX_AUTH_PASS="replace-with-a-strong-password" \
+    ./bin/zetnix --addr 127.0.0.1:9090
+  ```
 
 ### Option A: Single Binary on Linux VPS + HTTPS Reverse Proxy
 
@@ -176,7 +197,7 @@ All CLI flags have corresponding environment variables:
 | CLI Flag | Environment Variable | Default | Description |
 |---|---|---|---|
 | `--addr` | `ZETNIX_ADDR` | `:8080` | HTTP listen address |
-| `--kubeconfig` | `KUBECONFIG` | `~/.kube/config` | Path to kubeconfig file (falls back to in-cluster or Demo mode) |
+| `--kubeconfig` | `KUBECONFIG` | `auto` | Path to kubeconfig file (auto-discovers `~/.kube/config`, `k3s.yaml`, `rke2.yaml`, `admin.conf`, or falls back to in-cluster / Demo mode) |
 | `--context` | `ZETNIX_CONTEXT` | `""` | Initial kubeconfig context override |
 | `--demo` | `ZETNIX_DEMO` | `false` | Force built-in interactive Demo Sandbox Cluster |
 | `--allow-kubeconfig-upload` | `ZETNIX_ALLOW_KUBECONFIG_UPLOAD` | `true` | Allow connecting clusters via UI (SSH/Kubeconfig/Token) |
