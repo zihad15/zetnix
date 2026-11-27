@@ -1,0 +1,139 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: zetnix-system
+  labels:
+    app.kubernetes.io/name: zetnix
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: zetnix-console
+  namespace: zetnix-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: zetnix-console-admin
+rules:
+  - apiGroups: ["", "apps", "batch", "networking.k8s.io", "autoscaling", "metrics.k8s.io"]
+    resources: ["*"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: zetnix-console-admin
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: zetnix-console-admin
+subjects:
+  - kind: ServiceAccount
+    name: zetnix-console
+    namespace: zetnix-system
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: zetnix-auth
+  namespace: zetnix-system
+type: Opaque
+stringData:
+  username: admin
+  # Change this before exposing publicly on a VPS!
+  password: change-me-zetnix-password
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: zetnix
+  namespace: zetnix-system
+  labels:
+    app: zetnix
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: zetnix
+  template:
+    metadata:
+      labels:
+        app: zetnix
+    spec:
+      serviceAccountName: zetnix-console
+      containers:
+        - name: zetnix
+          image: zetnix:1.0.0
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: ZETNIX_AUTH_USER
+              valueFrom:
+                secretKeyRef:
+                  name: zetnix-auth
+                  key: username
+            - name: ZETNIX_AUTH_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: zetnix-auth
+                  key: password
+            # Disable UI kubeconfig upload in production in-cluster mode if desired:
+            - name: ZETNIX_ALLOW_KUBECONFIG_UPLOAD
+              value: "false"
+          ports:
+            - name: http
+              containerPort: 8080
+          resources:
+            requests:
+              cpu: 25m
+              memory: 32Mi
+            limits:
+              cpu: 250m
+              memory: 128Mi
+          livenessProbe:
+            httpGet:
+              path: /api/v1/health
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /api/v1/health
+              port: http
+            initialDelaySeconds: 2
+            periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: zetnix
+  namespace: zetnix-system
+  labels:
+    app: zetnix
+spec:
+  type: ClusterIP
+  selector:
+    app: zetnix
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+---
+# Optional Ingress for k3s/k3d Traefik (uncomment and set your domain):
+# apiVersion: networking.k8s.io/v1
+# kind: Ingress
+# metadata:
+#   name: zetnix
+#   namespace: zetnix-system
+# spec:
+#   rules:
+#     - host: zetnix.your-domain.com
+#       http:
+#         paths:
+#           - path: /
+#             pathType: Prefix
+#             backend:
+#               service:
+#                 name: zetnix
+#                 port:
+#                   number: 80

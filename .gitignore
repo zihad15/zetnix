@@ -1,0 +1,24 @@
+# Go & Node builds
+/bin/
+/dist/
+/zetnix
+*.exe
+*.out
+*.test
+
+# Frontend artifacts
+web/node_modules/
+web/dist/
+web/.vite/
+*.tsbuildinfo
+
+# Local env & kubeconfigs
+.env
+.env.*
+*.kubeconfig
+kubeconfig*.yaml
+
+# IDE & OS
+.DS_Store
+.idea/
+.vscode/
