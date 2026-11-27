@@ -13,12 +13,16 @@ Zetnix compiles the entire React frontend and Go control-plane backend into a **
 
 ## Features
 
-- **Dual Perspectives (`Platform` & `Developer`)**: Switch between cluster administration (Command Center, Nodes & Compute, Events, Storage) and application workflows (Topology Mesh, Developer Catalog, Deployments, Routes).
-- **Interactive Topology Mesh**: Pan, zoom, and rearrange application topology graphs grouping Ingresses → Services → Workloads (Deployments, StatefulSets, DaemonSets, Jobs) → PVCs with live replica rings and Pod status indicators.
+- **Dual Perspectives (`Platform` & `Developer`)**: Switch between cluster administration (Command Center, Nodes & Compute, Events, Storage) and application workflows (Topology Mesh, Developer Catalog, Deployments, Routes). Switching to **Developer** automatically scopes out system namespaces just like OpenShift.
+- **OpenShift-Style Project Scoping**: Cleanly separates **Your Projects** from **System Namespaces** (`kube-system`, `kube-public`, `kube-node-lease`), includes a one-click **`Hide kube-*`** filter toggle, inline project/namespace creation, and smart default namespace targeting across YAML templates.
+- **Interactive Topology Mesh**: Pan, zoom, drag, and auto fit-to-screen across application topology graphs grouping Ingresses → Services → Workloads (Deployments, StatefulSets, DaemonSets, Jobs, CronJobs) & standalone Pods → PVCs with layer filters, live replica rings, and Pod status dots.
+- **Command Center & Incident Diagnostics**: Radial health index gauge, live CPU & Memory telemetry sparklines, Pod phase distribution bar, actionable diagnostic alert banner jumping straight to failing Pod logs (`CrashLoopBackOff`, `ImagePullBackOff`, `Failed`), and quick-filter tables (**Issues Only**).
+- **Rich Resource Inspector Drawer**: Dedicated detail panels for Pods (containers, node jump link, parent workload link), Workloads (scale `+/-`, rollout restart, managed Pods), Nodes (host/runtime info, conditions, scheduled Pods), Services (port mappings, selectors, endpoints), Ingresses (TLS & routing rules), ConfigMaps (copyable values), Secrets (masked metadata), and PVCs.
 - **Real-Time Sync & Single-Shot Snapshot**: Consolidated `/api/v1/snapshot` payload paired with Kubernetes Watch over Server-Sent Events (`/api/v1/watch`) so Pod and Deployment transitions update automatically without manual refresh.
 - **Live Log Streaming (`SSE`)**: Stream container logs in real time with container selector, tail length (`100` / `250` / `1000`), grep search, line wrapping, pause/follow, and `.log` export.
 - **Interactive Web Terminal (`xterm.js` + WebSocket PTY)**: Attach an interactive `/bin/sh` or `/bin/bash` session directly into any running container via `k8s.io/client-go` SPDY `remotecommand` with dynamic PTY resize and proxy keepalive pings.
-- **Multi-Document YAML Studio & App Catalog**: Client-side YAML syntax validation (`js-yaml`), auto-formatting, live resource YAML inspection/editing, multi-document apply (`---`), and starter templates.
+- **Multi-Document YAML Studio, App Catalog & Quick Creators**: Client-side YAML syntax validation (`js-yaml`), auto-formatting, live resource YAML inspection/editing, multi-document apply (`---`), Developer Catalog stacks, and contextual **`+ New PVC`**, **`+ New ConfigMap`**, and **`+ New Secret`** buttons.
+- **Command Palette (`⌘K` / `Ctrl+K`) & Dual Themes**: Instant Spotlight search across views, workloads, pods, and services, with Obsidian Dark and Daylight Light themes.
 - **In-UI Multi-Cluster Setup**:
   - **VPS SSH Auto-Tunnel**: Pure-Go (`golang.org/x/crypto/ssh`) SSH tunnel that automatically discovers and reads the remote kubeconfig (`~/.kube/config`, `k3s.yaml`, `rke2.yaml`, `admin.conf`, `k0s`, `microk8s`) and forwards the Kubernetes API locally in memory.
   - **Kubeconfig File / YAML**: Switch contexts from `~/.kube/config`, upload a `.yaml`/`config` file, or paste kubeconfig YAML in memory.

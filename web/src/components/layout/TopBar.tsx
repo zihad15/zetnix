@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import {
   ChevronDown,
+  EyeOff,
   Flame,
   FolderPlus,
   LogOut,
@@ -14,11 +15,15 @@ import {
 } from 'lucide-react'
 import type { ClusterStatus, NamespaceSummary } from '../../types/k8s'
 
+export const SYSTEM_NAMESPACES = new Set(['kube-system', 'kube-public', 'kube-node-lease', 'zetnix-system'])
+
 interface TopBarProps {
   cluster: ClusterStatus | null
   namespaces: NamespaceSummary[]
   activeNamespace: string
   onNamespaceChange: (ns: string) => void
+  hideSystem: boolean
+  onToggleHideSystem: () => void
   onCreateNamespace: (name: string) => Promise<void>
   onOpenClusterModal: () => void
   onOpenCreateYaml: () => void
@@ -36,6 +41,8 @@ export function TopBar({
   namespaces,
   activeNamespace,
   onNamespaceChange,
+  hideSystem,
+  onToggleHideSystem,
   onCreateNamespace,
   onOpenClusterModal,
   onOpenCreateYaml,
@@ -106,15 +113,49 @@ export function TopBar({
                   : 'bg-slate-50 border-slate-200 text-slate-800'
               }`}
             >
-              <option value="all">Project: All Namespaces</option>
-              {namespaces.map((ns) => (
-                <option key={ns.name} value={ns.name}>
-                  ns / {ns.name} ({ns.podCount} pods)
-                </option>
-              ))}
+              <option value="all">{hideSystem ? 'Project: Your Projects' : 'Project: All Namespaces'}</option>
+              {namespaces.some((n) => !SYSTEM_NAMESPACES.has(n.name)) && (
+                <optgroup label="Your Projects">
+                  {namespaces
+                    .filter((n) => !SYSTEM_NAMESPACES.has(n.name))
+                    .map((ns) => (
+                      <option key={ns.name} value={ns.name}>
+                        ns / {ns.name} ({ns.podCount} pods)
+                      </option>
+                    ))}
+                </optgroup>
+              )}
+              {namespaces.some((n) => SYSTEM_NAMESPACES.has(n.name)) && (
+                <optgroup label="System Namespaces">
+                  {namespaces
+                    .filter((n) => SYSTEM_NAMESPACES.has(n.name))
+                    .map((ns) => (
+                      <option key={ns.name} value={ns.name}>
+                        sys / {ns.name} ({ns.podCount} pods)
+                      </option>
+                    ))}
+                </optgroup>
+              )}
             </select>
             <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
           </div>
+
+          {activeNamespace === 'all' && (
+            <button
+              onClick={onToggleHideSystem}
+              title="Hide built-in kube-* system namespaces (like OpenShift Developer scope)"
+              className={`hidden sm:inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl border text-[11px] font-semibold cursor-pointer transition-colors ${
+                hideSystem
+                  ? 'bg-cyan-500/15 border-cyan-500/35 text-cyan-400'
+                  : dark
+                    ? 'bg-[#0d1424] border-slate-800 text-slate-400 hover:text-slate-200'
+                    : 'bg-slate-50 border-slate-200 text-slate-600'
+              }`}
+            >
+              <EyeOff className="w-3.5 h-3.5" />
+              Hide kube-*
+            </button>
+          )}
 
           {creatingNS ? (
             <form onSubmit={handleCreate} className="flex items-center gap-1">

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Lock } from 'lucide-react'
 import { api } from './lib/api'
 import { CATALOG_TEMPLATES } from './lib/templates'
@@ -22,7 +22,7 @@ import type {
   WorkloadSummary,
 } from './types/k8s'
 import { Sidebar } from './components/layout/Sidebar'
-import { TopBar } from './components/layout/TopBar'
+import { SYSTEM_NAMESPACES, TopBar } from './components/layout/TopBar'
 import { CommandPalette } from './components/layout/CommandPalette'
 import { ClusterOverview } from './components/overview/ClusterOverview'
 import { TopologyCanvas } from './components/topology/TopologyCanvas'
@@ -92,6 +92,7 @@ export default function App() {
   const [perspective, setPerspective] = useState<Perspective>('admin')
   const [section, setSection] = useState<NavSection>('overview')
   const [activeNS, setActiveNS] = useState('all')
+  const [hideSystem, setHideSystem] = useState(false)
 
   const [cluster, setCluster] = useState<ClusterStatus | null>(null)
   const [overview, setOverview] = useState<OverviewData | null>(null)
@@ -344,20 +345,91 @@ export default function App() {
     }
   }
 
-  const warningCount = events.filter((e) => e.type === 'Warning').length
+  const filterUserScope = activeNS === 'all' && hideSystem
+
+  const visiblePods = useMemo(
+    () => (filterUserScope ? pods.filter((p) => !SYSTEM_NAMESPACES.has(p.namespace)) : pods),
+    [pods, filterUserScope],
+  )
+  const visibleWorkloads = useMemo(
+    () => (filterUserScope ? workloads.filter((w) => !SYSTEM_NAMESPACES.has(w.namespace)) : workloads),
+    [workloads, filterUserScope],
+  )
+  const visibleServices = useMemo(
+    () => (filterUserScope ? services.filter((s) => !SYSTEM_NAMESPACES.has(s.namespace)) : services),
+    [services, filterUserScope],
+  )
+  const visibleIngresses = useMemo(
+    () => (filterUserScope ? ingresses.filter((i) => !SYSTEM_NAMESPACES.has(i.namespace)) : ingresses),
+    [ingresses, filterUserScope],
+  )
+  const visibleConfigMaps = useMemo(
+    () => (filterUserScope ? configMaps.filter((c) => !SYSTEM_NAMESPACES.has(c.namespace)) : configMaps),
+    [configMaps, filterUserScope],
+  )
+  const visibleSecrets = useMemo(
+    () => (filterUserScope ? secrets.filter((s) => !SYSTEM_NAMESPACES.has(s.namespace)) : secrets),
+    [secrets, filterUserScope],
+  )
+  const visiblePvcs = useMemo(
+    () => (filterUserScope ? pvcs.filter((p) => !SYSTEM_NAMESPACES.has(p.namespace)) : pvcs),
+    [pvcs, filterUserScope],
+  )
+  const visibleEvents = useMemo(
+    () => (filterUserScope ? events.filter((e) => !SYSTEM_NAMESPACES.has(e.namespace)) : events),
+    [events, filterUserScope],
+  )
+  const visibleTopology = useMemo(() => {
+    if (!topology || !filterUserScope) return topology
+    const nodes = topology.nodes.filter((n) => !SYSTEM_NAMESPACES.has(n.namespace))
+    const ids = new Set(nodes.map((n) => n.id))
+    return {
+      ...topology,
+      nodes,
+      edges: topology.edges.filter((e) => ids.has(e.source) && ids.has(e.target)),
+      groups: topology.groups.filter((g) => !SYSTEM_NAMESPACES.has(g.namespace)),
+    }
+  }, [topology, filterUserScope])
+
+  const defaultTargetNS = useMemo(() => {
+    if (activeNS !== 'all') return activeNS
+    if (namespaces.some((n) => n.name === 'production')) return 'production'
+    const firstUser = namespaces.find((n) => !SYSTEM_NAMESPACES.has(n.name))
+    return firstUser?.name || 'default'
+  }, [activeNS, namespaces])
+
+  const handlePerspectiveChange = (next: Perspective) => {
+    setPerspective(next)
+    if (next === 'developer') {
+      setHideSystem(true)
+      if (activeNS === 'all' || SYSTEM_NAMESPACES.has(activeNS)) {
+        const firstUser = namespaces.find((n) => !SYSTEM_NAMESPACES.has(n.name))
+        if (firstUser) setActiveNS(firstUser.name)
+      }
+    }
+  }
+
+  const handleNamespaceChange = (ns: string) => {
+    setActiveNS(ns)
+    if (ns !== 'all' && SYSTEM_NAMESPACES.has(ns)) {
+      setHideSystem(false)
+    }
+  }
+
+  const warningCount = visibleEvents.filter((e) => e.type === 'Warning').length
 
   return (
     <div className={`h-screen flex overflow-hidden ${dark ? 'bg-[#060911] text-slate-100' : 'bg-slate-50 text-slate-900'}`}>
       <Sidebar
         perspective={perspective}
-        onPerspectiveChange={setPerspective}
+        onPerspectiveChange={handlePerspectiveChange}
         activeSection={section}
         onSelectSection={setSection}
         watchConnected={watchConnected}
         dark={dark}
         counts={{
-          pods: pods.length,
-          workloads: workloads.length,
+          pods: visiblePods.length,
+          workloads: visibleWorkloads.length,
           nodes: nodes.length,
           warnings: warningCount,
         }}
@@ -368,12 +440,13 @@ export default function App() {
           cluster={cluster}
           namespaces={namespaces}
           activeNamespace={activeNS}
-          onNamespaceChange={setActiveNS}
+          onNamespaceChange={handleNamespaceChange}
+          hideSystem={hideSystem}
+          onToggleHideSystem={() => setHideSystem((v) => !v)}
           onCreateNamespace={handleCreateNamespace}
           onOpenClusterModal={() => setClusterModalOpen(true)}
           onOpenCreateYaml={() => {
-            const ns = activeNS === 'all' ? 'production' : activeNS
-            setCreateYamlDraft(DEFAULT_CREATE_YAML.replace(/namespace: production/g, `namespace: ${ns}`))
+            setCreateYamlDraft(DEFAULT_CREATE_YAML.replace(/namespace: production/g, `namespace: ${defaultTargetNS}`))
             setCreateYamlOpen(true)
           }}
           onOpenCommandPalette={() => setPaletteOpen(true)}
@@ -389,7 +462,7 @@ export default function App() {
           {section === 'overview' && (
             <ClusterOverview
               overview={overview}
-              pods={pods}
+              pods={visiblePods}
               history={history}
               dark={dark}
               onNavigate={setSection}
@@ -398,14 +471,14 @@ export default function App() {
           )}
 
           {section === 'topology' && (
-            <TopologyCanvas graph={topology} dark={dark} onInspect={setInspected} />
+            <TopologyCanvas graph={visibleTopology} dark={dark} onInspect={setInspected} />
           )}
 
           {(section === 'workloads' || section === 'pods') && (
             <WorkloadsView
               mode={section}
-              workloads={workloads}
-              pods={pods}
+              workloads={visibleWorkloads}
+              pods={visiblePods}
               dark={dark}
               onInspect={setInspected}
               onChanged={(msg) => {
@@ -416,30 +489,34 @@ export default function App() {
           )}
 
           {section === 'networking' && (
-            <NetworkingView services={services} ingresses={ingresses} dark={dark} onInspect={setInspected} />
+            <NetworkingView services={visibleServices} ingresses={visibleIngresses} dark={dark} onInspect={setInspected} />
           )}
 
           {section === 'storage' && (
             <StorageAndConfigView
-              pvcs={pvcs}
-              configMaps={configMaps}
-              secrets={secrets}
+              pvcs={visiblePvcs}
+              configMaps={visibleConfigMaps}
+              secrets={visibleSecrets}
+              activeNamespace={defaultTargetNS}
               dark={dark}
               onInspect={setInspected}
+              onCreateManifest={(yamlTemplate) => {
+                setCreateYamlDraft(yamlTemplate)
+                setCreateYamlOpen(true)
+              }}
             />
           )}
 
           {section === 'nodes' && <NodesView nodes={nodes} dark={dark} onInspect={setInspected} />}
 
-          {section === 'events' && <EventsView events={events} dark={dark} onInspect={setInspected} />}
+          {section === 'events' && <EventsView events={visibleEvents} dark={dark} onInspect={setInspected} />}
 
           {section === 'catalog' && (
             <CatalogView
-              activeNamespace={activeNS}
+              activeNamespace={defaultTargetNS}
               dark={dark}
               onLaunchTemplate={(tpl) => {
-                const ns = activeNS === 'all' ? 'production' : activeNS
-                setCreateYamlDraft(tpl.buildYaml(ns))
+                setCreateYamlDraft(tpl.buildYaml(defaultTargetNS))
                 setCreateYamlOpen(true)
               }}
             />
@@ -448,7 +525,7 @@ export default function App() {
           {section === 'yaml' && (
             <div className="h-[calc(100vh-130px)] rounded-2xl border border-slate-800 bg-[#090f1d]/95 p-5">
               <YamlStudio
-                initialYaml={CATALOG_TEMPLATES[0].buildYaml(activeNS === 'all' ? 'production' : activeNS)}
+                initialYaml={CATALOG_TEMPLATES[0].buildYaml(defaultTargetNS)}
                 onApplied={(summary) => {
                   showToast(`Applied: ${summary}`)
                   loadAll(activeNS)
@@ -503,9 +580,9 @@ export default function App() {
       <CommandPalette
         open={paletteOpen}
         onClose={() => setPaletteOpen(false)}
-        pods={pods}
-        workloads={workloads}
-        services={services}
+        pods={visiblePods}
+        workloads={visibleWorkloads}
+        services={visibleServices}
         onNavigate={setSection}
         onInspect={setInspected}
       />

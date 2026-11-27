@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Cpu, Globe, HardDrive, KeyRound, Lock, Network, Radio, Server } from 'lucide-react'
+import { Cpu, Globe, HardDrive, KeyRound, Lock, Network, Plus, Radio, Server } from 'lucide-react'
 import type {
   ConfigMapSummary,
   EventSummary,
@@ -137,26 +137,73 @@ export function StorageAndConfigView({
   pvcs,
   configMaps,
   secrets,
+  activeNamespace,
   dark,
   onInspect,
+  onCreateManifest,
 }: {
   pvcs: PVCSummary[]
   configMaps: ConfigMapSummary[]
   secrets: SecretSummary[]
+  activeNamespace: string
   dark: boolean
   onInspect: (res: InspectedResource) => void
+  onCreateManifest: (yaml: string) => void
 }) {
+  const targetNS = activeNamespace === 'all' ? 'default' : activeNamespace
   const cardCls = `rounded-2xl border overflow-hidden ${dark ? 'bg-[#0b1120]/85 border-slate-800/80' : 'bg-white border-slate-200 shadow-sm'}`
   const divCls = dark ? 'divide-slate-800/60' : 'divide-slate-200'
   const headCls = dark ? 'border-slate-800 text-slate-400 bg-[#0d1424]/70' : 'border-slate-200 text-slate-500 bg-slate-50'
   const rowCls = dark ? 'hover:bg-slate-800/35' : 'hover:bg-slate-50'
+  const btnCls = `inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border text-[11px] font-semibold cursor-pointer transition-colors ${
+    dark ? 'bg-[#0d1424] border-slate-700 hover:border-cyan-500 text-cyan-300' : 'bg-white border-slate-300 hover:border-cyan-500 text-cyan-700'
+  }`
+
+  const pvcTemplate = `apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: app-data-pvc
+  namespace: ${targetNS}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+`
+
+  const configMapTemplate = `apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-config
+  namespace: ${targetNS}
+data:
+  APP_ENV: production
+  LOG_LEVEL: info
+`
+
+  const secretTemplate = `apiVersion: v1
+kind: Secret
+metadata:
+  name: app-secret
+  namespace: ${targetNS}
+type: Opaque
+stringData:
+  API_KEY: replace-with-secret-value
+`
 
   return (
     <div className="space-y-6">
       <div className={cardCls}>
-        <div className={`px-4 py-3 border-b flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-orange-500 ${dark ? 'border-slate-800/80' : 'border-slate-200'}`}>
-          <HardDrive className="w-4 h-4" />
-          Persistent Volume Claims ({pvcs.length})
+        <div className={`px-4 py-3 border-b flex items-center justify-between ${dark ? 'border-slate-800/80' : 'border-slate-200'}`}>
+          <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-orange-500">
+            <HardDrive className="w-4 h-4" />
+            Persistent Volume Claims ({pvcs.length})
+          </div>
+          <button onClick={() => onCreateManifest(pvcTemplate)} className={btnCls}>
+            <Plus className="w-3.5 h-3.5" />
+            New PVC
+          </button>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse text-xs">
@@ -198,8 +245,14 @@ export function StorageAndConfigView({
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <div className={cardCls}>
-          <div className={`px-4 py-3 border-b text-xs font-bold uppercase tracking-wider text-cyan-500 ${dark ? 'border-slate-800/80' : 'border-slate-200'}`}>
-            ConfigMaps ({configMaps.length})
+          <div className={`px-4 py-3 border-b flex items-center justify-between ${dark ? 'border-slate-800/80' : 'border-slate-200'}`}>
+            <span className="text-xs font-bold uppercase tracking-wider text-cyan-500">
+              ConfigMaps ({configMaps.length})
+            </span>
+            <button onClick={() => onCreateManifest(configMapTemplate)} className={btnCls}>
+              <Plus className="w-3.5 h-3.5" />
+              New ConfigMap
+            </button>
           </div>
           <div className={`divide-y text-xs ${divCls}`}>
             {configMaps.map((cm) => (
@@ -221,9 +274,15 @@ export function StorageAndConfigView({
         </div>
 
         <div className={cardCls}>
-          <div className={`px-4 py-3 border-b flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-violet-500 ${dark ? 'border-slate-800/80' : 'border-slate-200'}`}>
-            <KeyRound className="w-4 h-4" />
-            Secrets ({secrets.length})
+          <div className={`px-4 py-3 border-b flex items-center justify-between ${dark ? 'border-slate-800/80' : 'border-slate-200'}`}>
+            <span className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-violet-500">
+              <KeyRound className="w-4 h-4" />
+              Secrets ({secrets.length})
+            </span>
+            <button onClick={() => onCreateManifest(secretTemplate)} className={btnCls}>
+              <Plus className="w-3.5 h-3.5" />
+              New Secret
+            </button>
           </div>
           <div className={`divide-y text-xs ${divCls}`}>
             {secrets.map((sec) => (
