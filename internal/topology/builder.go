@@ -61,6 +61,7 @@ func BuildFromData(
 
 	groupNodes := make(map[string][]string)
 	groupNS := make(map[string]string)
+	assignedPods := make(map[string]bool)
 
 	for _, w := range workloads {
 		id := nodeID(w.Kind, w.Namespace, w.Name)
@@ -83,6 +84,9 @@ func BuildFromData(
 					matchedPods = append(matchedPods, p)
 				}
 			}
+		}
+		for _, p := range matchedPods {
+			assignedPods[p.Namespace+"/"+p.Name] = true
 		}
 
 		status := workloadHealth(w, matchedPods)
@@ -267,6 +271,41 @@ func BuildFromData(
 		}
 	}
 
+	// Include standalone Pods (not owned by a listed Workload) so ad-hoc pods remain visible.
+	for _, p := range pods {
+		if assignedPods[p.Namespace+"/"+p.Name] {
+			continue
+		}
+		id := nodeID("Pod", p.Namespace, p.Name)
+		appGroup := extractAppGroup(p.Labels, "")
+		st := "healthy"
+		if p.StatusReason == "CrashLoopBackOff" || p.StatusReason == "ImagePullBackOff" || p.Phase == "Failed" {
+			st = "failing"
+		} else if p.Phase == "Pending" {
+			st = "pending"
+		}
+		graph.Nodes = append(graph.Nodes, driver.TopologyNode{
+			ID:              id,
+			Kind:            "Pod",
+			Name:            p.Name,
+			Namespace:       p.Namespace,
+			AppGroup:        appGroup,
+			Status:          st,
+			DesiredReplicas: 1,
+			ReadyReplicas:   boolToReplica(p.Phase == "Running"),
+			Pods:            []driver.PodSummary{p},
+			Meta: map[string]string{
+				"node": p.NodeName,
+				"ip":   p.PodIP,
+			},
+		})
+		if appGroup != "" {
+			gKey := p.Namespace + ":" + appGroup
+			groupNodes[gKey] = append(groupNodes[gKey], id)
+			groupNS[gKey] = p.Namespace
+		}
+	}
+
 	var gKeys []string
 	for k := range groupNodes {
 		gKeys = append(gKeys, k)
@@ -291,12 +330,19 @@ func podOwnedByWorkload(kind, workloadName, ownerName string) bool {
 	if ownerName == workloadName {
 		return true
 	}
-	if kind == "Deployment" {
+	if kind == "Deployment" || kind == "CronJob" {
 		if idx := strings.LastIndex(ownerName, "-"); idx > 0 {
 			return ownerName[:idx] == workloadName
 		}
 	}
 	return false
+}
+
+func boolToReplica(ok bool) int32 {
+	if ok {
+		return 1
+	}
+	return 0
 }
 
 func layoutNodes(graph *driver.TopologyGraph) {

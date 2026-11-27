@@ -389,6 +389,7 @@ export default function App() {
           {section === 'overview' && (
             <ClusterOverview
               overview={overview}
+              pods={pods}
               history={history}
               dark={dark}
               onNavigate={setSection}
@@ -462,6 +463,12 @@ export default function App() {
         resource={inspected}
         pods={pods}
         workloads={workloads}
+        nodes={nodes}
+        services={services}
+        ingresses={ingresses}
+        configMaps={configMaps}
+        secrets={secrets}
+        pvcs={pvcs}
         onClose={() => setInspected(null)}
         onChanged={(msg) => {
           showToast(msg)

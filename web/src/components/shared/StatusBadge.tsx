@@ -38,20 +38,20 @@ export function ZetnixLogo({ size = 28, live = false }: { size?: number; live?: 
 
 export function StatusBadge({ status }: { status: string }) {
   const s = (status || '').toLowerCase()
-  let cls = 'bg-slate-500/15 text-slate-300 border-slate-500/30'
+  let cls = 'bg-slate-500/15 text-slate-400 border-slate-500/30'
   let dot = 'bg-slate-400'
 
   if (['running', 'ready', 'active', 'bound', 'healthy', 'complete', 'succeeded', 'normal'].includes(s)) {
-    cls = 'bg-emerald-500/12 text-emerald-300 border-emerald-500/30'
+    cls = 'bg-emerald-500/15 text-emerald-400 border-emerald-500/35'
     dot = 'bg-emerald-400'
   } else if (['pending', 'progressing', 'updating', 'degraded', 'warning', 'terminating'].includes(s)) {
-    cls = 'bg-amber-500/12 text-amber-300 border-amber-500/30'
+    cls = 'bg-amber-500/15 text-amber-400 border-amber-500/35'
     dot = 'bg-amber-400 animate-pulse'
   } else if (['crashloopbackoff', 'imagepullbackoff', 'failed', 'error', 'failing', 'notready', 'oomkilled'].includes(s)) {
-    cls = 'bg-rose-500/15 text-rose-300 border-rose-500/35'
+    cls = 'bg-rose-500/15 text-rose-400 border-rose-500/35'
     dot = 'bg-rose-400 animate-ping'
   } else if (s === 'scaled to 0' || s === 'suspended') {
-    cls = 'bg-slate-600/20 text-slate-400 border-slate-500/25'
+    cls = 'bg-slate-500/15 text-slate-400 border-slate-500/30'
     dot = 'bg-slate-500'
   }
 
@@ -67,18 +67,18 @@ export function StatusBadge({ status }: { status: string }) {
 
 export function KindBadge({ kind }: { kind: string }) {
   const map: Record<string, string> = {
-    Pod: 'bg-cyan-500/15 text-cyan-300 border-cyan-500/30',
-    Deployment: 'bg-indigo-500/15 text-indigo-300 border-indigo-500/30',
-    StatefulSet: 'bg-violet-500/15 text-violet-300 border-violet-500/30',
-    DaemonSet: 'bg-fuchsia-500/15 text-fuchsia-300 border-fuchsia-500/30',
-    CronJob: 'bg-amber-500/15 text-amber-300 border-amber-500/30',
-    Job: 'bg-amber-500/15 text-amber-300 border-amber-500/30',
-    Service: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30',
-    Ingress: 'bg-sky-500/15 text-sky-300 border-sky-500/30',
-    PersistentVolumeClaim: 'bg-orange-500/15 text-orange-300 border-orange-500/30',
-    Node: 'bg-teal-500/15 text-teal-300 border-teal-500/30',
+    Pod: 'bg-cyan-500/15 text-cyan-400 border-cyan-500/30',
+    Deployment: 'bg-indigo-500/15 text-indigo-400 border-indigo-500/30',
+    StatefulSet: 'bg-violet-500/15 text-violet-400 border-violet-500/30',
+    DaemonSet: 'bg-fuchsia-500/15 text-fuchsia-400 border-fuchsia-500/30',
+    CronJob: 'bg-amber-500/15 text-amber-400 border-amber-500/30',
+    Job: 'bg-amber-500/15 text-amber-400 border-amber-500/30',
+    Service: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30',
+    Ingress: 'bg-sky-500/15 text-sky-400 border-sky-500/30',
+    PersistentVolumeClaim: 'bg-orange-500/15 text-orange-400 border-orange-500/30',
+    Node: 'bg-teal-500/15 text-teal-400 border-teal-500/30',
   }
-  const style = map[kind] || 'bg-slate-500/15 text-slate-300 border-slate-500/30'
+  const style = map[kind] || 'bg-slate-500/15 text-slate-400 border-slate-500/30'
   const short = kind === 'PersistentVolumeClaim' ? 'PVC' : kind
   return (
     <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-mono font-semibold tracking-wide border ${style}`}>

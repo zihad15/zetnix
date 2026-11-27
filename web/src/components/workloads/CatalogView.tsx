@@ -41,8 +41,8 @@ export function CatalogView({
                 </span>
                 <span className="text-[11px] font-mono text-slate-400">{tpl.version}</span>
               </div>
-              <h3 className="text-base font-bold text-slate-100">{tpl.title}</h3>
-              <p className="text-xs text-slate-300 mt-1.5 leading-relaxed">{tpl.description}</p>
+              <h3 className={`text-base font-bold ${dark ? 'text-slate-100' : 'text-slate-900'}`}>{tpl.title}</h3>
+              <p className={`text-xs mt-1.5 leading-relaxed ${dark ? 'text-slate-300' : 'text-slate-600'}`}>{tpl.description}</p>
             </div>
 
             <div className="mt-5 pt-3 border-t border-slate-800/50 flex items-center justify-between">

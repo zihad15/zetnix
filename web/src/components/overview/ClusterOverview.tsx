@@ -1,6 +1,7 @@
 import {
   Activity,
   AlertTriangle,
+  ArrowRight,
   Box,
   Cpu,
   Globe,
@@ -11,7 +12,7 @@ import {
   Server,
   ShieldCheck,
 } from 'lucide-react'
-import type { ClusterOverview as OverviewData, InspectedResource, NavSection } from '../../types/k8s'
+import type { ClusterOverview as OverviewData, InspectedResource, NavSection, PodSummary } from '../../types/k8s'
 import { formatAge, formatCores, formatMemoryMiB } from '../../lib/api'
 import { KindBadge, StatusBadge } from '../shared/StatusBadge'
 
@@ -23,6 +24,7 @@ interface TelemetryPoint {
 
 interface ClusterOverviewProps {
   overview: OverviewData | null
+  pods: PodSummary[]
   history: TelemetryPoint[]
   dark: boolean
   onNavigate: (s: NavSection) => void
@@ -39,7 +41,7 @@ function RadialGauge({ value, label, sub, color }: { value: number; label: strin
     <div className="flex items-center gap-4">
       <div className="relative w-24 h-24 shrink-0">
         <svg viewBox="0 0 96 96" className="w-full h-full -rotate-90">
-          <circle cx="48" cy="48" r={r} fill="none" stroke="rgba(148,163,184,0.14)" strokeWidth="8" />
+          <circle cx="48" cy="48" r={r} fill="none" stroke="rgba(148,163,184,0.16)" strokeWidth="8" />
           <circle
             cx="48"
             cy="48"
@@ -92,7 +94,7 @@ function SparkArea({ points, dataKey, stroke, fillId, fillColor }: { points: Tel
   )
 }
 
-export function ClusterOverview({ overview, history, dark, onNavigate, onInspect }: ClusterOverviewProps) {
+export function ClusterOverview({ overview, pods, history, dark, onNavigate, onInspect }: ClusterOverviewProps) {
   if (!overview) {
     return (
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 animate-pulse">
@@ -104,8 +106,12 @@ export function ClusterOverview({ overview, history, dark, onNavigate, onInspect
   }
 
   const cardCls = `rounded-2xl border backdrop-blur-xl transition-all ${
-    dark ? 'bg-[#0b1120]/85 border-slate-800/80' : 'bg-white/90 border-slate-200 shadow-sm'
+    dark ? 'bg-[#0b1120]/85 border-slate-800/80' : 'bg-white/95 border-slate-200 shadow-sm'
   }`
+
+  const failingPods = pods.filter((p) =>
+    ['CrashLoopBackOff', 'ImagePullBackOff', 'Error', 'OOMKilled'].includes(p.statusReason) || p.phase === 'Failed',
+  )
 
   const healthColor = overview.healthScore >= 85 ? '#34d399' : overview.healthScore >= 65 ? '#fbbf24' : '#fb7185'
   const totalPods = Math.max(1, overview.pods.total)
@@ -121,12 +127,46 @@ export function ClusterOverview({ overview, history, dark, onNavigate, onInspect
 
   return (
     <div className="space-y-5">
+      {/* Actionable Diagnostic Alert Strip (OpenShift-style Status Alert) */}
+      {failingPods.length > 0 && (
+        <div
+          onClick={() =>
+            onInspect({
+              kind: 'Pod',
+              namespace: failingPods[0].namespace,
+              name: failingPods[0].name,
+              initialTab: 'logs',
+              raw: failingPods[0],
+            })
+          }
+          className={`rounded-2xl border px-4 py-3 flex flex-wrap items-center justify-between gap-3 cursor-pointer transition-all ${
+            dark
+              ? 'bg-rose-500/10 border-rose-500/35 hover:bg-rose-500/15 text-rose-200'
+              : 'bg-rose-50 border-rose-200 hover:bg-rose-100/70 text-rose-900'
+          }`}
+        >
+          <div className="flex items-center gap-3 text-xs">
+            <span className="p-1.5 rounded-xl bg-rose-500/20 text-rose-400">
+              <AlertTriangle className="w-4 h-4" />
+            </span>
+            <div>
+              <span className="font-bold">{failingPods.length} pod{failingPods.length > 1 ? 's' : ''} requiring attention:</span>{' '}
+              <span className="font-mono">{failingPods[0].namespace}/{failingPods[0].name}</span>{' '}
+              <span className="opacity-80">({failingPods[0].statusReason})</span>
+            </div>
+          </div>
+          <span className="inline-flex items-center gap-1 text-xs font-bold text-rose-400">
+            Inspect Logs <ArrowRight className="w-3.5 h-3.5" />
+          </span>
+        </div>
+      )}
+
       {/* Top Hero Row: Cluster Pulse + Compute Telemetry */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* Cluster Health Card */}
         <div className={`${cardCls} p-5 flex flex-col justify-between relative overflow-hidden`}>
           <div className="flex items-center justify-between mb-3">
-            <span className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-cyan-400">
+            <span className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-cyan-500">
               <ShieldCheck className="w-4 h-4" />
               Cluster Integrity
             </span>
@@ -140,9 +180,9 @@ export function ClusterOverview({ overview, history, dark, onNavigate, onInspect
             sub={`${overview.nodesReady}/${overview.nodesTotal} Nodes Ready • ${overview.namespacesCount} Projects`}
             color={healthColor}
           />
-          <div className="mt-4 pt-3 border-t border-slate-800/60 flex items-center justify-between text-xs">
+          <div className={`mt-4 pt-3 border-t flex items-center justify-between text-xs ${dark ? 'border-slate-800/60' : 'border-slate-200'}`}>
             <span className="text-slate-400">Pods Running</span>
-            <span className="font-mono font-semibold text-emerald-400">
+            <span className="font-mono font-semibold text-emerald-500">
               {overview.pods.running} / {overview.pods.total}
               {overview.pods.crashLoop > 0 && (
                 <span className="ml-2 text-rose-400">({overview.pods.crashLoop} CrashLoop)</span>
@@ -154,11 +194,11 @@ export function ClusterOverview({ overview, history, dark, onNavigate, onInspect
         {/* CPU Telemetry Card */}
         <div className={`${cardCls} p-5 flex flex-col justify-between`}>
           <div className="flex items-center justify-between">
-            <span className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-cyan-400">
+            <span className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-cyan-500">
               <Cpu className="w-4 h-4" />
               CPU Utilization
             </span>
-            <span className="text-xs font-mono font-bold text-cyan-300">
+            <span className={`text-xs font-mono font-bold ${dark ? 'text-cyan-300' : 'text-cyan-700'}`}>
               {overview.metricsAvailable ? `${overview.usage.cpuPercent.toFixed(1)}%` : 'No Metrics Server'}
             </span>
           </div>
@@ -167,7 +207,7 @@ export function ClusterOverview({ overview, history, dark, onNavigate, onInspect
           </div>
           <div className="flex items-center justify-between text-xs text-slate-400">
             <span>Allocated Demand</span>
-            <span className="font-mono text-slate-200">
+            <span className={`font-mono ${dark ? 'text-slate-200' : 'text-slate-700'}`}>
               {formatCores(overview.usage.usedMilliCpu)} / {formatCores(overview.usage.totalMilliCpu)}
             </span>
           </div>
@@ -176,11 +216,11 @@ export function ClusterOverview({ overview, history, dark, onNavigate, onInspect
         {/* Memory Telemetry Card */}
         <div className={`${cardCls} p-5 flex flex-col justify-between`}>
           <div className="flex items-center justify-between">
-            <span className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-violet-400">
+            <span className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-violet-500">
               <MemoryStick className="w-4 h-4" />
               Memory Footprint
             </span>
-            <span className="text-xs font-mono font-bold text-violet-300">
+            <span className={`text-xs font-mono font-bold ${dark ? 'text-violet-300' : 'text-violet-700'}`}>
               {overview.metricsAvailable ? `${overview.usage.memoryPercent.toFixed(1)}%` : 'No Metrics Server'}
             </span>
           </div>
@@ -189,7 +229,7 @@ export function ClusterOverview({ overview, history, dark, onNavigate, onInspect
           </div>
           <div className="flex items-center justify-between text-xs text-slate-400">
             <span>Working Set</span>
-            <span className="font-mono text-slate-200">
+            <span className={`font-mono ${dark ? 'text-slate-200' : 'text-slate-700'}`}>
               {formatMemoryMiB(overview.usage.usedMemoryMiB)} / {formatMemoryMiB(overview.usage.totalMemoryMiB)}
             </span>
           </div>
@@ -199,8 +239,8 @@ export function ClusterOverview({ overview, history, dark, onNavigate, onInspect
       {/* Pod Phase Distribution Bar */}
       <div className={`${cardCls} p-4`}>
         <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
-          <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-300">
-            <Activity className="w-4 h-4 text-cyan-400" />
+          <div className={`flex items-center gap-2 text-xs font-bold uppercase tracking-wider ${dark ? 'text-slate-300' : 'text-slate-700'}`}>
+            <Activity className="w-4 h-4 text-cyan-500" />
             Pod Phase Distribution
           </div>
           <div className="flex flex-wrap items-center gap-4 text-xs">
@@ -210,7 +250,7 @@ export function ClusterOverview({ overview, history, dark, onNavigate, onInspect
             <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-cyan-400" />Succeeded: <b>{overview.pods.succeeded}</b></span>
           </div>
         </div>
-        <div className="h-3 rounded-full overflow-hidden flex bg-slate-800/80">
+        <div className={`h-3 rounded-full overflow-hidden flex ${dark ? 'bg-slate-800/80' : 'bg-slate-200'}`}>
           <div style={{ width: `${(overview.pods.running / totalPods) * 100}%` }} className="bg-gradient-to-r from-emerald-500 to-teal-400 transition-all duration-500" />
           <div style={{ width: `${(overview.pods.pending / totalPods) * 100}%` }} className="bg-amber-400 transition-all duration-500" />
           <div style={{ width: `${((overview.pods.crashLoop + overview.pods.failed) / totalPods) * 100}%` }} className="bg-rose-500 transition-all duration-500" />
@@ -228,8 +268,8 @@ export function ClusterOverview({ overview, history, dark, onNavigate, onInspect
               className={`${cardCls} p-4 text-left hover:border-cyan-500/45 hover:-translate-y-0.5 cursor-pointer group`}
             >
               <div className="flex items-center justify-between mb-2">
-                <span className="p-2 rounded-xl bg-slate-800/70 group-hover:bg-cyan-500/15 transition-colors">{tile.icon}</span>
-                <span className="text-[11px] text-slate-400 group-hover:text-cyan-300 transition-colors">Explore →</span>
+                <span className={`p-2 rounded-xl transition-colors ${dark ? 'bg-slate-800/70 group-hover:bg-cyan-500/15' : 'bg-slate-100 group-hover:bg-cyan-50'}`}>{tile.icon}</span>
+                <span className="text-[11px] text-slate-400 group-hover:text-cyan-400 transition-colors">Explore →</span>
               </div>
               <div className="text-2xl font-extrabold font-mono tracking-tight">{tile.val}</div>
               <div className="text-xs font-semibold mt-0.5">{tile.label}</div>
@@ -247,12 +287,12 @@ export function ClusterOverview({ overview, history, dark, onNavigate, onInspect
             </div>
             <button
               onClick={() => onNavigate('events')}
-              className="text-xs text-cyan-400 hover:text-cyan-300 font-semibold cursor-pointer"
+              className="text-xs text-cyan-500 hover:text-cyan-400 font-semibold cursor-pointer"
             >
               View All Events →
             </button>
           </div>
-          <div className="divide-y divide-slate-800/60 overflow-y-auto max-h-80">
+          <div className={`divide-y overflow-y-auto max-h-80 ${dark ? 'divide-slate-800/60' : 'divide-slate-200'}`}>
             {overview.recentEvents.length === 0 ? (
               <div className="py-10 text-center text-xs text-slate-500">No recent Kubernetes events in this scope</div>
             ) : (
@@ -268,14 +308,16 @@ export function ClusterOverview({ overview, history, dark, onNavigate, onInspect
                       name: ev.involvedName,
                     })
                   }
-                  className="py-2.5 px-2 rounded-lg hover:bg-slate-800/40 transition-colors flex items-start justify-between gap-3 cursor-pointer"
+                  className={`py-2.5 px-2 rounded-lg transition-colors flex items-start justify-between gap-3 cursor-pointer ${
+                    dark ? 'hover:bg-slate-800/40' : 'hover:bg-slate-50'
+                  }`}
                 >
                   <div className="min-w-0 space-y-1">
                     <div className="flex flex-wrap items-center gap-2">
                       <StatusBadge status={ev.type} />
-                      <span className="text-xs font-bold font-mono text-slate-200">{ev.reason}</span>
+                      <span className="text-xs font-bold font-mono">{ev.reason}</span>
                       <KindBadge kind={ev.involvedKind} />
-                      <span className="text-xs font-mono text-cyan-300 truncate">{ev.involvedName}</span>
+                      <span className={`text-xs font-mono truncate ${dark ? 'text-cyan-300' : 'text-cyan-700'}`}>{ev.involvedName}</span>
                     </div>
                     <p className="text-xs text-slate-400 leading-relaxed">{ev.message}</p>
                   </div>
